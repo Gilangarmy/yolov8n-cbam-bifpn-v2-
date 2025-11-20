@@ -27,6 +27,10 @@ from ultralytics.nn.modules import (
     A2C2f,
     AConv,
     ADown,
+    # ✅ TAMBAHAN BARU - Import modul CBAM dan BiFPN
+    BiFPN,
+    BottleneckCBAM,
+    # ✅ END TAMBAHAN
     Bottleneck,
     BottleneckCSP,
     C2f,
@@ -1524,6 +1528,10 @@ def parse_model(d, ch, verbose=True):
             ConvTranspose,
             GhostConv,
             Bottleneck,
+            # TAMBAHAN BARU - Modul CBAM dan BiFPN
+            BiFPN,
+            BottleneckCBAM,
+            # END TAMBAHAN
             GhostBottleneck,
             SPP,
             SPPF,
@@ -1572,6 +1580,10 @@ def parse_model(d, ch, verbose=True):
             C2fCIB,
             C2PSA,
             A2C2f,
+            # TAMBAHAN BARU - BottleneckCBAM bisa memiliki repeats
+            BottleneckCBAM,
+            # END TAMBAHAN
+
         }
     )
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
@@ -1621,6 +1633,27 @@ def parse_model(d, ch, verbose=True):
             c2 = args[1] if args[3] else args[1] * 4
         elif m is torch.nn.BatchNorm2d:
             args = [ch[f]]
+          # ✅ TAMBAHAN BARU - Handle BiFPN module
+        elif m is BiFPN:
+            # BiFPN mengambil multiple input features dan menghasilkan multiple output
+            # channels, num_levels, weight_method, act
+            c2 = args[0]  # output channels
+            # Untuk BiFPN, kita perlu menghitung input channels dari semua feature maps
+            if isinstance(f, list):
+                # Jika multiple inputs, gunakan channel dari input pertama sebagai reference
+                c1 = ch[f[0]]
+            else:
+                c1 = ch[f]
+            args = [c2, *args[1:]]  # channels, num_levels, weight_method, act
+
+            # ✅ TAMBAHAN BARU - Handle BottleneckCBAM module  
+        elif m is BottleneckCBAM:
+            # BottleneckCBAM: c1, c2, shortcut, g, k, e
+            c1, c2 = ch[f], args[0]
+            if c2 != nc:  # if c2 not equal to number of classes
+                c2 = make_divisible(min(c2, max_channels) * width, 8)
+            args = [c1, c2, *args[1:]]
+
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
         elif m in frozenset(
