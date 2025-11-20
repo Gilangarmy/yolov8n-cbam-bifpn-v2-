@@ -27,12 +27,10 @@ from ultralytics.nn.modules import (
     A2C2f,
     AConv,
     ADown,
-    # ✅ TAMBAHAN BARU - Import modul CBAM dan BiFPN
-    BiFPN,
-    BottleneckCBAM,
-    # ✅ END TAMBAHAN
     Bottleneck,
     BottleneckCSP,
+    BiFPN,
+    BottleneckCBAM,
     C2f,
     C2fAttn,
     C2fCIB,
@@ -1528,10 +1526,8 @@ def parse_model(d, ch, verbose=True):
             ConvTranspose,
             GhostConv,
             Bottleneck,
-            # TAMBAHAN BARU - Modul CBAM dan BiFPN
             BiFPN,
             BottleneckCBAM,
-            # END TAMBAHAN
             GhostBottleneck,
             SPP,
             SPPF,
@@ -1566,6 +1562,7 @@ def parse_model(d, ch, verbose=True):
     repeat_modules = frozenset(  # modules with 'repeat' arguments
         {
             BottleneckCSP,
+            BottleneckCBAM,
             C1,
             C2,
             C2f,
@@ -1580,10 +1577,6 @@ def parse_model(d, ch, verbose=True):
             C2fCIB,
             C2PSA,
             A2C2f,
-            # TAMBAHAN BARU - BottleneckCBAM bisa memiliki repeats
-            BottleneckCBAM,
-            # END TAMBAHAN
-
         }
     )
     for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
@@ -1621,19 +1614,7 @@ def parse_model(d, ch, verbose=True):
                     args.extend((True, 1.2))
             if m is C2fCIB:
                 legacy = False
-        elif m is AIFI:
-            args = [ch[f], *args]
-        elif m in frozenset({HGStem, HGBlock}):
-            c1, cm, c2 = ch[f], args[0], args[1]
-            args = [c1, cm, c2, *args[2:]]
-            if m is HGBlock:
-                args.insert(4, n)  # number of repeats
-                n = 1
-        elif m is ResNetLayer:
-            c2 = args[1] if args[3] else args[1] * 4
-        elif m is torch.nn.BatchNorm2d:
-            args = [ch[f]]
-          # ✅ TAMBAHAN BARU - Handle BiFPN module
+        
         elif m is BiFPN:
             # BiFPN mengambil multiple input features dan menghasilkan multiple output
             # channels, num_levels, weight_method, act
@@ -1646,7 +1627,7 @@ def parse_model(d, ch, verbose=True):
                 c1 = ch[f]
             args = [c2, *args[1:]]  # channels, num_levels, weight_method, act
 
-            # ✅ TAMBAHAN BARU - Handle BottleneckCBAM module  
+        # ✅ TAMBAHAN BARU - Handle BottleneckCBAM module  
         elif m is BottleneckCBAM:
             # BottleneckCBAM: c1, c2, shortcut, g, k, e
             c1, c2 = ch[f], args[0]
@@ -1654,6 +1635,18 @@ def parse_model(d, ch, verbose=True):
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
             args = [c1, c2, *args[1:]]
 
+        elif m is AIFI:
+            args = [ch[f], *args]
+        elif m in frozenset({HGStem, HGBlock}):
+            c1, cm, c2 = ch[f], args[0], args[1]
+            args = [c1, cm, c2, *args[2:]]
+            if m is HGBlock:
+                args.insert(4, n)  # number of repeats
+                n = 1
+        elif m is ResNetLayer:
+            c2 = args[1] if args[3] else args[1] * 4
+        elif m is torch.nn.BatchNorm2d:
+            args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
         elif m in frozenset(
