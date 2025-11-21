@@ -63,14 +63,10 @@ class BiFPNLayer(nn.Module):
 
 
 class BiFPN(nn.Module):
-    """
-    Full BiFPN Stack (num_layers times)
-    """
-    def __init__(self, channels=(256, 512, 1024), num_layers=6):
+    def __init__(self, channels, num_layers=6):   # channels diterima dari parser
         super().__init__()
-        self.layers = nn.ModuleList([
-            BiFPNLayer(channels) for _ in range(num_layers)
-        ])
+        self.layers = nn.ModuleList([BiFPNLayer(channels) for _ in range(num_layers)])
+
 
     def forward(self, inputs):
         """
