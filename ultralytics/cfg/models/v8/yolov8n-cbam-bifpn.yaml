@@ -17,7 +17,7 @@ backbone:
 
 head:
   # BiFPN (6 layers)
-  - [ [4,6,9], 1, BiFPN, [6] ]
+  - [ [4, 6, 9], 1, BiFPN, [6] ]
 
-  # Detect (langsung dari 3 output BiFPN)
+  # Detect
   - [ -1, 1, Detect, [nc] ]
