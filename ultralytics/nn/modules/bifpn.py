@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ultralytics.nn.modules import Conv
+from ultralytics.nn.modules.conv import Conv
 
 
 def fast_norm(weights, eps=1e-4):
