@@ -12,6 +12,7 @@ import torch.nn as nn
 
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
+    
     AIFI,
     C1,
     C2,
@@ -29,8 +30,6 @@ from ultralytics.nn.modules import (
     ADown,
     Bottleneck,
     BottleneckCSP,
-    BiFPN,
-    BottleneckCBAM,
     C2f,
     C2fAttn,
     C2fCIB,
@@ -1526,8 +1525,6 @@ def parse_model(d, ch, verbose=True):
             ConvTranspose,
             GhostConv,
             Bottleneck,
-            BiFPN,
-            BottleneckCBAM,
             GhostBottleneck,
             SPP,
             SPPF,
@@ -1562,7 +1559,6 @@ def parse_model(d, ch, verbose=True):
     repeat_modules = frozenset(  # modules with 'repeat' arguments
         {
             BottleneckCSP,
-            BottleneckCBAM,
             C1,
             C2,
             C2f,
@@ -1614,27 +1610,6 @@ def parse_model(d, ch, verbose=True):
                     args.extend((True, 1.2))
             if m is C2fCIB:
                 legacy = False
-        
-        elif m is BiFPN:
-            # BiFPN mengambil multiple input features dan menghasilkan multiple output
-            # channels, num_levels, weight_method, act
-            c2 = args[0]  # output channels
-            # Untuk BiFPN, kita perlu menghitung input channels dari semua feature maps
-            if isinstance(f, list):
-                # Jika multiple inputs, gunakan channel dari input pertama sebagai reference
-                c1 = ch[f[0]]
-            else:
-                c1 = ch[f]
-            args = [c2, *args[1:]]  # channels, num_levels, weight_method, act
-
-        # ✅ TAMBAHAN BARU - Handle BottleneckCBAM module  
-        elif m is BottleneckCBAM:
-            # BottleneckCBAM: c1, c2, shortcut, g, k, e
-            c1, c2 = ch[f], args[0]
-            if c2 != nc:  # if c2 not equal to number of classes
-                c2 = make_divisible(min(c2, max_channels) * width, 8)
-            args = [c1, c2, *args[1:]]
-
         elif m is AIFI:
             args = [ch[f], *args]
         elif m in frozenset({HGStem, HGBlock}):

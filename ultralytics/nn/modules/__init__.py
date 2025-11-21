@@ -37,10 +37,6 @@ from .block import (
     BNContrastiveHead,
     Bottleneck,
     BottleneckCSP,
-     # TAMBAHAN BARU DI SINI
-    BiFPN,
-    BottleneckCBAM,
-    # END TAMBAHAN
     C2f,
     C2fAttn,
     C2fCIB,
@@ -130,10 +126,6 @@ __all__ = (
     "BNContrastiveHead",
     "Bottleneck",
     "BottleneckCSP",
-    # TAMBAHAN BARU DI SINI
-    "BiFPN",
-    "BottleneckCBAM",
-    # END TAMBAHAN
     "C2f",
     "C2fAttn",
     "C2fCIB",

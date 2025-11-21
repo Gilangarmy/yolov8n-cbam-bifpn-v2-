@@ -192,3 +192,9 @@ calibration_*.npy
 *.heic
 *.ico
 *.raw
+
+# EXCEPT ultralytics/assets (allow images)
+!/ultralytics/assets/
+!/ultralytics/assets/*.jpg
+!/ultralytics/assets/*.jpeg
+!/ultralytics/assets/*.png

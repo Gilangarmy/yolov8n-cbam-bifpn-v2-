@@ -7,8 +7,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ultralytics.utils.torch_utils import fuse_conv_and_bn
 
+from ultralytics.utils.torch_utils import fuse_conv_and_bn
+from ultralytics.nn.modules.conv import CBAM
 from .conv import Conv, DWConv, GhostConv, LightConv, RepConv, autopad
 from .transformer import TransformerBlock
 
@@ -279,6 +280,28 @@ class C2(nn.Module):
         a, b = self.cv1(x).chunk(2, 1)
         return self.cv2(torch.cat((self.m(a), b), 1))
 
+class BottleneckCBAM(nn.Module):
+    def __init__(self, c1, c2, shortcut=True, g=1, k=((3,3),(3,3)), e=1.0):
+        super().__init__()
+        hidden = int(c2 * e)
+
+        # mengikuti struktur YOLO: Conv1x1 → Conv3x3
+        self.cv1 = Conv(c1, hidden, 1, 1)
+        self.cv2 = Conv(hidden, c2, k[0], 1, g=g)
+
+        # Tambah CBAM setelah konvolusi ke-2
+        self.cbam = CBAM(c2)
+
+        self.add = shortcut and c1 == c2
+
+    def forward(self, x):
+        y = self.cv1(x)
+        y = self.cv2(y)
+
+        # CBAM sebelum residual
+        y = self.cbam(y)
+
+        return x + y if self.add else y
 
 class C2f(nn.Module):
     """Faster Implementation of CSP Bottleneck with 2 convolutions."""
@@ -298,7 +321,9 @@ class C2f(nn.Module):
         self.c = int(c2 * e)  # hidden channels
         self.cv1 = Conv(c1, 2 * self.c, 1, 1)
         self.cv2 = Conv((2 + n) * self.c, c2, 1)  # optional act=FReLU(c2)
-        self.m = nn.ModuleList(Bottleneck(self.c, self.c, shortcut, g, k=((3, 3), (3, 3)), e=1.0) for _ in range(n))
+        self.m = nn.ModuleList(
+        BottleneckCBAM(self.c, self.c, shortcut, g, k=((3,3),(3,3)), e=1.0)
+        for _ in range(n))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through C2f layer."""
@@ -1943,88 +1968,3 @@ class SAVPE(nn.Module):
         aggregated = score.transpose(-2, -3) @ x.reshape(B, self.c, C // self.c, -1).transpose(-1, -2)
 
         return F.normalize(aggregated.transpose(-2, -3).reshape(B, Q, -1), dim=-1, p=2)
-    
-class BiFPN(nn.Module):
-    """Bidirectional Feature Pyramid Network (BiFPN) module for efficient multi-scale feature fusion.
-    
-    This module implements weighted feature fusion with learnable weights for each input feature.
-    
-    Args:
-        channels (int): Number of input/output channels.
-        num_levels (int): Number of feature levels.
-        weight_method (str): Weight fusion method ('fast_attn' or 'sum').
-        act (bool): Whether to apply activation after fusion.
-    """
-    
-    def __init__(self, channels, num_levels=4, weight_method='fast_attn', act=True):
-        super().__init__()
-        self.channels = channels
-        self.num_levels = num_levels
-        self.weight_method = weight_method
-        
-        # Learnable weights for feature fusion
-        if weight_method == 'fast_attn':
-            self.weights = nn.Parameter(torch.ones(num_levels, dtype=torch.float32), requires_grad=True)
-        elif weight_method == 'sum':
-            self.weights = nn.Parameter(torch.ones(num_levels, dtype=torch.float32), requires_grad=True)
-        
-        self.act = nn.SiLU() if act else nn.Identity()
-        
-        # Feature fusion convolutions
-        self.fusion_conv = nn.ModuleList([
-            Conv(channels, channels, 3, 1, act=act) for _ in range(num_levels)
-        ])
-    
-    def forward(self, features):
-        """Forward pass of BiFPN.
-        
-        Args:
-            features (list[torch.Tensor]): List of input features at different scales.
-            
-        Returns:
-            list[torch.Tensor]: Fused features at different scales.
-        """
-        assert len(features) == self.num_levels, f"Expected {self.num_levels} features, got {len(features)}"
-        
-        # Normalize weights
-        if self.weight_method == 'fast_attn':
-            weights = F.relu(self.weights)
-            norm_weights = weights / (torch.sum(weights, dim=0) + 1e-4)
-        else:  # sum
-            norm_weights = self.weights
-        
-        # Weighted feature fusion
-        fused_features = []
-        for i, (feat, weight) in enumerate(zip(features, norm_weights)):
-            weighted_feat = feat * weight
-            fused_feat = self.fusion_conv[i](weighted_feat)
-            fused_features.append(self.act(fused_feat))
-        
-        return fused_features
-    
-class BottleneckCBAM(nn.Module):
-    """Bottleneck block with CBAM attention mechanism.
-    
-    This module combines standard bottleneck operations with CBAM attention
-    for enhanced feature representation.
-    
-    Args:
-        c1 (int): Input channels.
-        c2 (int): Output channels.
-        shortcut (bool): Whether to use shortcut connection.
-        g (int): Groups for convolution.
-        k (tuple): Kernel sizes for convolutions.
-        e (float): Expansion ratio.
-    """
-    
-    def __init__(self, c1, c2, shortcut=True, g=1, k=(3, 3), e=0.5):
-        super().__init__()
-        c_ = int(c2 * e)  # hidden channels
-        self.cv1 = Conv(c1, c_, k[0], 1)
-        self.cv2 = Conv(c_, c2, k[1], 1, g=g)
-        self.cbam = CBAM(c2)  # CBAM attention module
-        self.add = shortcut and c1 == c2
-    
-    def forward(self, x):
-        """Forward pass with CBAM attention."""
-        return x + self.cbam(self.cv2(self.cv1(x))) if self.add else self.cbam(self.cv2(self.cv1(x)))
