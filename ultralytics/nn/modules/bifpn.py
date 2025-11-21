@@ -101,4 +101,4 @@ class BiFPN(nn.Module):
         for layer in self.layers:
             P3, P4, P5 = layer(P3, P4, P5)
 
-        return P3, P4, P5
+        return [P3, P4, P5]
