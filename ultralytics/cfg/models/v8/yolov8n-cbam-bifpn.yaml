@@ -8,16 +8,16 @@ backbone:
   - [ -1, 1, Conv, [128, 3, 2] ]
   - [ -1, 3, C2f, [128, True] ]
   - [ -1, 1, Conv, [256, 3, 2] ]
-  - [ -1, 6, C2f, [256, True] ]     # P3 = index 4
+  - [ -1, 6, C2f, [256, True] ]     # P3 index = 4
   - [ -1, 1, Conv, [512, 3, 2] ]
-  - [ -1, 6, C2f, [512, True] ]     # P4 = index 6
+  - [ -1, 6, C2f, [512, True] ]     # P4 index = 6
   - [ -1, 1, Conv, [1024, 3, 2] ]
   - [ -1, 3, C2f, [1024, True] ]
-  - [ -1, 1, SPPF, [1024, 5] ]      # P5 = index 9
+  - [ -1, 1, SPPF, [1024, 5] ]      # P5 index = 9
 
 head:
-  # BiFPN (gunakan 6 layer default pada kode kamu)
-  - [ [4, 6, 9], 6, BiFPN ]
+  # BiFPN
+  - [ [4, 6, 9], 6, BiFPN, [] ]
 
   # Detect
   - [ -1, 1, Detect, [nc] ]
