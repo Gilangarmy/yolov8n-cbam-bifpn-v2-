@@ -16,8 +16,5 @@ backbone:
   - [ -1, 1, SPPF, [1024, 5] ]      # P5 index = 9
 
 head:
-  # BiFPN
-  - [ [4, 6, 9], 6, BiFPN, [] ]
-
-  # Detect
-  - [ -1, 1, Detect, [nc] ]
+  - [ [4, 6, 9], 6, BiFPN, [] ]     # BiFPN fix
+  - [ [-1], 1, Detect, [nc] ]       # Detect fix (from harus list)
