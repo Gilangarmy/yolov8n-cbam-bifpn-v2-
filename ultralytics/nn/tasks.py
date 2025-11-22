@@ -10,9 +10,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from ultralytics.nn.modules.bifpn import BiFPN
-globals()["BiFPN"] = BiFPN
-
+from ultralytics.nn.BIFPN import BiFPN_Concat2, BiFPN_Concat3
 from ultralytics.nn.autobackend import check_class_names
 from ultralytics.nn.modules import (
     
@@ -1625,14 +1623,8 @@ def parse_model(d, ch, verbose=True):
             c2 = args[1] if args[3] else args[1] * 4
         elif m is torch.nn.BatchNorm2d:
             args = [ch[f]]
-        elif m is Concat:
+        elif m in {Concat, BiFPN_Concat2, BiFPN_Concat3}:
             c2 = sum(ch[x] for x in f)
-        elif m is BiFPN:
-            c = [ch[x] for x in f]     # channels input P3,P4,P5
-            args = [c] + args          # args = [channels, num_layers]
-            c2 = max(c)                # output channel = channel terbesar
-            ch.append(c2)
-            continue
         elif m in frozenset(
             {Detect, WorldDetect, YOLOEDetect, Segment, YOLOESegment, Pose, OBB, ImagePoolingAttn, v10Detect}
         ):
